@@ -24,7 +24,7 @@ namespace OpenRCT2::GameActions
         VehicleColourTertiary,
         VehicleColourScheme,
         EntranceStyle,
-        SellingItemColourIsRandom
+        SellingItemColourMode,
     };
 
     class RideSetAppearanceAction final : public GameActionBase<GameCommand::SetRideAppearance>
@@ -46,5 +46,8 @@ namespace OpenRCT2::GameActions
         void Serialise(DataSerialiser& stream) override;
         Result Query(GameState_t& gameState, Park::ParkData& park) const override;
         Result Execute(GameState_t& gameState, Park::ParkData& park) const override;
+
+  private:
+        void RideSetCommonShopItemColour(Ride* ride, OpenRCT2::GameState_t& gameState) const;
     };
 } // namespace OpenRCT2::GameActions

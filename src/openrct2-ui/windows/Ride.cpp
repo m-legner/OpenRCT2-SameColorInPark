@@ -196,7 +196,8 @@ namespace OpenRCT2::Ui::Windows
         WIDX_TRACK_MAIN_COLOUR,
         WIDX_TRACK_ADDITIONAL_COLOUR,
         WIDX_TRACK_SUPPORT_COLOUR,
-        WIDX_SELL_ITEM_RANDOM_COLOUR_CHECKBOX,
+        WIDX_SELL_ITEM_COLOUR,
+        WIDX_SELL_ITEM_COLOUR_DROPDOWN,
         WIDX_MAZE_STYLE,
         WIDX_MAZE_STYLE_DROPDOWN,
         WIDX_PAINT_INDIVIDUAL_AREA,
@@ -342,7 +343,8 @@ namespace OpenRCT2::Ui::Windows
         makeWidget({ 79,  74}, { 12, 12}, WidgetType::colourBtn,    WindowColour::secondary, 0xFFFFFFFF,                    STR_SELECT_MAIN_COLOUR_TIP                   ),
         makeWidget({ 99,  74}, { 12, 12}, WidgetType::colourBtn,    WindowColour::secondary, 0xFFFFFFFF,                    STR_SELECT_ADDITIONAL_COLOUR_1_TIP           ),
         makeWidget({119,  74}, { 12, 12}, WidgetType::colourBtn,    WindowColour::secondary, 0xFFFFFFFF,                    STR_SELECT_SUPPORT_STRUCTURE_COLOUR_TIP      ),
-        makeWidget({100,  74}, {239, 12}, WidgetType::checkbox,     WindowColour::secondary, STR_RANDOM_COLOUR                                                           ),
+        makeWidget({100,  74}, {199, 14}, WidgetType::dropdownMenu, WindowColour::secondary, kStringIdEmpty,                STR_SELECT_COLORMODE                         ),
+        makeWidget({297,  74}, { 11, 12}, WidgetType::button,       WindowColour::secondary, STR_DROPDOWN_GLYPH,            STR_SELECT_COLORMODE                         ),
 
         makeWidget({ 74,  49}, {239, 14}, WidgetType::dropdownMenu, WindowColour::secondary                                                                              ),
         makeWidget({301,  50}, { 11, 12}, WidgetType::button,       WindowColour::secondary, STR_DROPDOWN_GLYPH                                                          ),
@@ -612,6 +614,19 @@ namespace OpenRCT2::Ui::Windows
         WindowRideMazeDesignOption{ STR_RIDE_DESIGN_MAZE_WOODEN_FENCES, SPR_RIDE_DESIGN_PREVIEW_MAZE_WOODEN_FENCES },
     };
     static_assert(std::size(MazeOptions) == 4);
+
+
+    struct ShopItemColorOption
+    {
+        ShopItemColorMode mode;
+        StringId text;
+    };
+    static constexpr std::array ShopItemColorOptions = {
+        ShopItemColorOption{ ShopItemColorMode::individual, STR_INDIVIDUAL_COLOUR },
+        ShopItemColorOption{ ShopItemColorMode::random, STR_RANDOM_COLOUR },
+        ShopItemColorOption{ ShopItemColorMode::common, STR_COMMON_COLOUR },
+    };
+    static_assert(std::size(ShopItemColorOptions) == static_cast<size_t>(ShopItemColorMode::count));
 
     struct GraphsYAxis
     {
@@ -4267,18 +4282,6 @@ namespace OpenRCT2::Ui::Windows
                 case WIDX_PAINT_INDIVIDUAL_AREA:
                     ToolSet(*this, WIDX_PAINT_INDIVIDUAL_AREA, Tool::paintDown);
                     break;
-                case WIDX_SELL_ITEM_RANDOM_COLOUR_CHECKBOX:
-                {
-                    auto ride = GetRide(rideId);
-                    if (ride != nullptr)
-                    {
-                        const bool currentlyEnabled = ride->flags.has(RideFlag::randomShopColours);
-                        auto rideSetAppearanceAction = GameActions::RideSetAppearanceAction(
-                            rideId, GameActions::RideSetAppearanceType::SellingItemColourIsRandom, currentlyEnabled ? 0 : 1, 0);
-                        GameActions::Execute(&rideSetAppearanceAction, gameState);
-                    }
-                    break;
-                }
                 case WIDX_RANDOMISE_VEHICLE_COLOURS:
                 {
                     auto ride = GetRide(rideId);
@@ -4404,6 +4407,20 @@ namespace OpenRCT2::Ui::Windows
                         colours[1], 0, Dropdown::Flag::StayOpen, 4, widgets[widgetIndex].right - dropdownWidget->left);
 
                     gDropdown.items[EnumValue(ride->trackColours[colourSchemeIndex].supports)].setChecked(true);
+                    break;
+                }
+                case WIDX_SELL_ITEM_COLOUR_DROPDOWN:
+                {
+                    for (size_t i = 0; i < static_cast<size_t>(ShopItemColorMode::count); ++i)
+                    {
+                        gDropdown.items[i] = Dropdown::MenuLabel(ShopItemColorOptions[i].text);
+                    }
+
+                    WindowDropdownShowTextCustomWidth(
+                        { windowPos.x + dropdownWidget->left, windowPos.y + dropdownWidget->top }, dropdownWidget->height(),
+                        colours[1], 0, Dropdown::Flag::StayOpen, static_cast<size_t>(ShopItemColorMode::count),
+                        widgets[widgetIndex].right - dropdownWidget->left);
+
                     break;
                 }
                 case WIDX_ENTRANCE_STYLE_DROPDOWN:
@@ -4594,6 +4611,13 @@ namespace OpenRCT2::Ui::Windows
                     GameActions::Execute(&rideSetAppearanceAction, gameState);
                 }
                 break;
+                case WIDX_SELL_ITEM_COLOUR_DROPDOWN:
+                {
+                    auto rideSetAppearanceAction = GameActions::RideSetAppearanceAction(
+                        rideId, GameActions::RideSetAppearanceType::SellingItemColourMode, dropdownIndex, 0);
+                    GameActions::Execute(&rideSetAppearanceAction, gameState);
+                }
+                break;
             }
         }
 
@@ -4698,16 +4722,28 @@ namespace OpenRCT2::Ui::Windows
             {
                 widgets[WIDX_TRACK_ADDITIONAL_COLOUR].type = WidgetType::empty;
             }
-
-            // Selling item random colour checkbox
+            // Selling item colour mode dropdown (individual, random, same throught park)
             if (ride->hasRecolourableShopItems())
             {
-                widgets[WIDX_SELL_ITEM_RANDOM_COLOUR_CHECKBOX].type = WidgetType::checkbox;
-                setWidgetPressed(WIDX_SELL_ITEM_RANDOM_COLOUR_CHECKBOX, ride->flags.has(RideFlag::randomShopColours));
+                widgets[WIDX_SELL_ITEM_COLOUR].type = WidgetType::dropdownMenu;
+                widgets[WIDX_SELL_ITEM_COLOUR_DROPDOWN].type = WidgetType::button;
+                if (ride->flags.has(RideFlag::randomShopColours))
+                {
+                    widgets[WIDX_SELL_ITEM_COLOUR].text = STR_RANDOM_COLOUR;
+                }
+                else if (ride->flags.has(RideFlag::commonShopColours))
+                {
+                    widgets[WIDX_SELL_ITEM_COLOUR].text = STR_COMMON_COLOUR;
+                }
+                else
+                {
+                    widgets[WIDX_SELL_ITEM_COLOUR].text = STR_INDIVIDUAL_COLOUR;
+                }
             }
             else
             {
-                widgets[WIDX_SELL_ITEM_RANDOM_COLOUR_CHECKBOX].type = WidgetType::empty;
+                widgets[WIDX_SELL_ITEM_COLOUR].type = WidgetType::empty; 
+                widgets[WIDX_SELL_ITEM_COLOUR_DROPDOWN].type = WidgetType::empty;
             }
 
             // Track supports colour
@@ -4738,7 +4774,8 @@ namespace OpenRCT2::Ui::Windows
             widgets[WIDX_TRACK_MAIN_COLOUR].moveTo               ({ 79, startY + 25});
             widgets[WIDX_TRACK_ADDITIONAL_COLOUR].moveTo         ({ 99, startY + 25});
             widgets[WIDX_TRACK_SUPPORT_COLOUR].moveTo            ({119, startY + 25});
-            widgets[WIDX_SELL_ITEM_RANDOM_COLOUR_CHECKBOX].moveTo({100, startY + 25});
+            widgets[WIDX_SELL_ITEM_COLOUR_DROPDOWN].moveTo       ({100, startY + 25});
+            widgets[WIDX_SELL_ITEM_COLOUR_DROPDOWN].moveTo       ({287, startY + 27});
             widgets[WIDX_MAZE_STYLE].moveTo                      ({ 74, startY + 0});
             widgets[WIDX_MAZE_STYLE_DROPDOWN].moveTo             ({301, startY + 1});
             widgets[WIDX_PAINT_INDIVIDUAL_AREA].moveTo           ({289, startY + 19});

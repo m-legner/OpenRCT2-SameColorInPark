@@ -131,6 +131,7 @@ enum class RideFlag : uint8_t
     fixedRatings,       // When set, the ratings will not be updated (useful for hacked rides).
     randomShopColours,
     reversedTrains,
+    commonShopColours,
 };
 using RideFlags = FlagHolder<uint32_t, RideFlag>;
 
@@ -895,3 +896,5 @@ void CircusMusicUpdate(Ride& ride);
 void DefaultMusicUpdate(Ride& ride);
 
 RideMode RideModeGetBlockSectionedCounterpart(RideMode originalMode);
+
+void RideSetCommonShopItemColour(Ride& newRide);

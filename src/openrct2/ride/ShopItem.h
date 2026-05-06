@@ -19,6 +19,11 @@ namespace OpenRCT2
     enum class PeepThoughtType : uint8_t;
 }
 
+namespace OpenRCT2::Drawing
+{
+    enum class Colour : uint8_t;
+}
+
 enum class ShopItem : uint8_t
 {
     balloon,
@@ -74,6 +79,15 @@ enum class ShopItem : uint8_t
     emptyBowlBlue,
     count = 56,
     none = 255
+};
+
+enum class ShopItemColorMode : uint8_t
+{
+    individual,
+    random,
+    common,
+
+    count = 3,
 };
 
 ShopItem& operator++(ShopItem& d, int);

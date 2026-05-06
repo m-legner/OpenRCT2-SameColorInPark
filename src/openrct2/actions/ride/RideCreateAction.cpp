@@ -299,6 +299,11 @@ namespace OpenRCT2::GameActions
         ride->maxCarsPerTrain = rideEntry->max_cars_in_train;
         RideSetVehicleColoursToRandomPreset(*ride, _vehicleColourPreset);
 
+        if (ride->hasRecolourableShopItems())
+        {
+            RideSetCommonShopItemColour(*ride);
+        }
+
         auto* windowMgr = Ui::GetWindowManager();
         windowMgr->InvalidateByClass(WindowClass::rideList);
 

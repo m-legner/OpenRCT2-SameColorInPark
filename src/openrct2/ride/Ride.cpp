@@ -5754,3 +5754,43 @@ RideMode RideModeGetBlockSectionedCounterpart(RideMode originalMode)
     assert(originalMode < RideMode::count);
     return kRideModeBlockSectionedCounterpart[EnumValue(originalMode)];
 }
+
+void RideSetCommonShopItemColour(Ride& newRide)
+{
+    const auto* newRideEntry = newRide.getRideEntry();
+    if (newRideEntry == nullptr)
+        return;
+
+    const auto& gameState = getGameState();
+    for (auto& otherRide : RideManager(gameState))
+    {
+        if (!otherRide.hasRecolourableShopItems())
+            continue;
+
+        const auto* otherRideEntry = otherRide.getRideEntry();
+        if (otherRideEntry != nullptr)
+        {
+            for (size_t otherItemIndex = 0; otherItemIndex < std::size(otherRideEntry->shop_item); ++otherItemIndex)
+            {
+                const ShopItem otherShopItem = otherRideEntry->shop_item[otherItemIndex];
+
+                for (size_t newItemIndex = 0; newItemIndex < std::size(newRideEntry->shop_item); ++newItemIndex)
+                {
+                    const ShopItem newShopItem = newRideEntry->shop_item[newItemIndex];
+
+                    if (otherShopItem == newShopItem)
+                    {
+                        if (otherRide.flags.has(RideFlag::commonShopColours))
+                        {
+                            newRide.trackColours[0].main = otherRide.trackColours[0].main;
+                            newRide.flags.set(RideFlag::commonShopColours);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+
+}

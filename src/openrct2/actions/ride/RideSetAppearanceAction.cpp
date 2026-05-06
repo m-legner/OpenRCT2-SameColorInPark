@@ -16,6 +16,7 @@
 #include "../../drawing/Drawing.h"
 #include "../../localisation/StringIds.h"
 #include "../../ride/Ride.h"
+#include "../../ride/RideManager.hpp"
 #include "../../ui/WindowManager.h"
 #include "../../world/Map.h"
 #include "../../world/Park.h"
@@ -81,7 +82,7 @@ namespace OpenRCT2::GameActions
                 break;
             case RideSetAppearanceType::VehicleColourScheme:
             case RideSetAppearanceType::EntranceStyle:
-            case RideSetAppearanceType::SellingItemColourIsRandom:
+            case RideSetAppearanceType::SellingItemColourMode:
                 break;
             default:
                 LOG_ERROR("Invalid ride appearance type %u", _type);
@@ -104,6 +105,10 @@ namespace OpenRCT2::GameActions
         {
             case RideSetAppearanceType::TrackColourMain:
                 ride->trackColours[_index].main = static_cast<Drawing::Colour>(_value);
+                if (ride->hasRecolourableShopItems() && ride->flags.has(RideFlag::commonShopColours))
+                {
+                    RideSetCommonShopItemColour(ride, gameState);
+                }
                 GfxInvalidateScreen();
                 break;
             case RideSetAppearanceType::TrackColourAdditional:
@@ -138,8 +143,27 @@ namespace OpenRCT2::GameActions
                 ride->entranceStyle = _value;
                 GfxInvalidateScreen();
                 break;
-            case RideSetAppearanceType::SellingItemColourIsRandom:
-                ride->flags.set(RideFlag::randomShopColours, static_cast<bool>(_value));
+            case RideSetAppearanceType::SellingItemColourMode:
+                ShopItemColorMode colorMode = static_cast<ShopItemColorMode>(_value);
+                switch (colorMode)
+                {
+                    case ShopItemColorMode::individual:
+                        ride->flags.set(RideFlag::randomShopColours, false);
+                        ride->flags.set(RideFlag::commonShopColours, false);
+                        break;
+
+                    case ShopItemColorMode::random:
+                        ride->flags.set(RideFlag::randomShopColours, true);
+                        ride->flags.set(RideFlag::commonShopColours, false);
+                        break;
+
+                    case ShopItemColorMode::common:
+                        ride->flags.set(RideFlag::randomShopColours, false);
+                        ride->flags.set(RideFlag::commonShopColours, true);
+                        RideSetCommonShopItemColour(ride, gameState);
+                        break;
+                }
+                GfxInvalidateScreen();
                 break;
         }
 
@@ -154,5 +178,44 @@ namespace OpenRCT2::GameActions
         }
 
         return res;
+    }
+
+    void RideSetAppearanceAction::RideSetCommonShopItemColour(Ride* ride, OpenRCT2::GameState_t& gameState) const
+    {
+        const auto* rideEntry = ride->getRideEntry();
+        if (rideEntry != nullptr)
+        {
+            for (size_t itemIndex = 0; itemIndex < std::size(rideEntry->shop_item); ++itemIndex)
+            {
+                for (auto& otherRide : RideManager(gameState))
+                {
+                    if (!otherRide.hasRecolourableShopItems())
+                        continue;
+
+                    bool invalidate = false;
+                    auto* otherRideEntry = GetRideEntryByIndex(otherRide.subtype);
+
+                    const ShopItem currentItem = rideEntry->shop_item[itemIndex];
+                    const Drawing::Colour colour = ride->trackColours[_index].main;
+
+                    if (otherRideEntry != nullptr && otherRideEntry->shop_item[0] == currentItem)
+                    {
+                        if (otherRide.trackColours[0].main != colour)
+                        {
+                            otherRide.trackColours[0].main = colour;
+                            otherRide.flags.set(RideFlag::commonShopColours);
+                            otherRide.flags.unset(RideFlag::randomShopColours);
+                            invalidate = true;
+                        }
+                    }
+
+                    if (invalidate)
+                    {
+                        auto* windowMgr = Ui::GetWindowManager();
+                        windowMgr->InvalidateByNumber(WindowClass::ride, otherRide.id.ToUnderlying());
+                    }
+                }
+            }
+        }
     }
 } // namespace OpenRCT2::GameActions
